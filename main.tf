@@ -13,114 +13,93 @@ provider "azurerm" {
   }
 }
 
-resource "azurerm_resource_group" "demo" {
-  name     = "mytf-rg"
-  location = "centralindia"
-  tags = {
-    "terraform" = "terraform"
-  }
+resource "azurerm_resource_group" "rg" {
+  name     = "rg"
+  location = "Central India"
 }
-resource "azurerm_virtual_network" "myvn" {
-  name                = "network"
-  resource_group_name = azurerm_resource_group.demo.name
-  location            = azurerm_resource_group.demo.location
-  address_space       = ["10.123.0.0/16"]
+
+resource "azurerm_virtual_network" "vnet" {
+  name                = "vnet"
+  address_space       = ["10.0.0.0/16"]
+  location            = azurerm_resource_group.rg.location
+  resource_group_name = azurerm_resource_group.rg.name
 }
-resource "azurerm_subnet" "mysubnet" {
+
+resource "azurerm_subnet" "subnet" {
   name                 = "subnet"
-  resource_group_name  = azurerm_resource_group.demo.name
-  virtual_network_name = azurerm_virtual_network.myvn.name
-  address_prefixes     = ["10.123.1.0/24"]
+  resource_group_name  = azurerm_resource_group.rg.name
+  virtual_network_name = azurerm_virtual_network.vnet.name
+  address_prefixes     = ["10.0.2.0/24"]
 }
 
-resource "azurerm_network_security_group" "mynsg" {
-  name                = "mynsg"
-  location            = azurerm_resource_group.demo.location
-  resource_group_name = azurerm_resource_group.demo.name
-
-  tags = {
-    "terraform" = "terraform"
-  }
-  security_rule {
-    name                       = "test123"
-    priority                   = 100
-    direction                  = "Inbound"
-    access                     = "Allow"
-    protocol                   = "*"
-    source_port_range          = "*"
-    destination_port_range     = "*"
-    source_address_prefix      = "*"
-    destination_address_prefix = "*"
-  }
-}
-resource "azurerm_public_ip" "myip" {
-  name                = "myip"
-  resource_group_name = azurerm_resource_group.demo.name
-  location            = azurerm_resource_group.demo.location
-  allocation_method   = "Static"
-  tags = {
-    "terraform" = "terraform"
-  }
-}
-resource "azurerm_network_interface" "mynic" {
+resource "azurerm_network_interface" "nic" {
   name                = "nic"
-  location            = azurerm_resource_group.demo.location
-  resource_group_name = azurerm_resource_group.demo.name
+  location            = azurerm_resource_group.rg.location
+  resource_group_name = azurerm_resource_group.rg.name
+
   ip_configuration {
     name                          = "internal"
-    subnet_id                     = azurerm_subnet.mysubnet.id
+    subnet_id                     = azurerm_subnet.subnet.id
     private_ip_address_allocation = "Dynamic"
-    public_ip_address_id          = azurerm_public_ip.myip.id
+    public_ip_address_id          = azurerm_public_ip.ip.id
   }
 }
-resource "azurerm_mysql_server" "example" {
-  name                = "mysqlserver"
-  location            = azurerm_resource_group.demo.location
-  resource_group_name = azurerm_resource_group.demo.name
 
-  administrator_login          = "adminuser"
-  administrator_login_password = "Arya@2000"
+resource "azurerm_linux_virtual_machine" "vm" {
+  name                = "vm"
+  resource_group_name = azurerm_resource_group.rg.name
+  location            = azurerm_resource_group.rg.location
+  size                = "Standard_F2"
+  admin_username      = "adminuser"
+  network_interface_ids = [
+    azurerm_network_interface.nic.id,
+  ]
 
-  sku_name   = "B_Gen5_2"
-  storage_mb = 5120
-  version    = "5.7"
+  admin_ssh_key {
+    username   = "adminuser"
+    public_key = file("~/.ssh/azurekey.pub")
+  }
 
-  auto_grow_enabled                 = true
-  backup_retention_days             = 7
-  geo_redundant_backup_enabled      = false
-  infrastructure_encryption_enabled = false
-  public_network_access_enabled     = true
-  ssl_enforcement_enabled           = true
-  ssl_minimal_tls_version_enforced  = "TLS1_2"
-}
-resource "azurerm_virtual_machine" "myvm" {
-  name                  = "myvm"
-  location              = azurerm_resource_group.demo.location
-  resource_group_name   = azurerm_resource_group.demo.name
-  network_interface_ids = [azurerm_network_interface.mynic.id]
-  vm_size               = "Standard_DS1_v2"
+  os_disk {
+    caching              = "ReadWrite"
+    storage_account_type = "Standard_LRS"
+  }
 
-  storage_image_reference {
+  source_image_reference {
     publisher = "Canonical"
     offer     = "UbuntuServer"
     sku       = "16.04-LTS"
     version   = "latest"
   }
-  storage_os_disk {
-    name              = "myosdisk1"
-    caching           = "ReadWrite"
-    create_option     = "FromImage"
-    managed_disk_type = "Standard_LRS"
-  }
-  os_profile {
-    computer_name  = "hostname"
-    admin_username = "testadmin"
-    admin_password = "Password1234!"
-  }
-  os_profile_linux_config {
-    disable_password_authentication = false
-  }
-  tags = {
-    environment = "staging"
-  }
+}
+resource "azurerm_network_security_group" "nsg" {
+  name                = "nsg"
+  location            = azurerm_resource_group.rg.location
+  resource_group_name = azurerm_resource_group.rg.name
+}
+
+resource "azurerm_network_security_rule" "nsgrule" {
+  name                        = "nsgrule"
+  priority                    = 100
+  direction                   = "Inbound"
+  access                      = "Allow"
+  protocol                    = "*"
+  source_port_range           = "*"
+  destination_port_range      = "*"
+  source_address_prefix       = "*"
+  destination_address_prefix  = "*"
+  resource_group_name         = azurerm_resource_group.rg.name
+  network_security_group_name = azurerm_network_security_group.nsg.name
+}
+
+resource "azurerm_subnet_network_security_group_association" "conn" {
+  subnet_id                 = azurerm_subnet.subnet.id
+  network_security_group_id = azurerm_network_security_group.nsg.id
+}
+
+resource "azurerm_public_ip" "ip" {
+  name                = "ip"
+  resource_group_name = azurerm_resource_group.rg.name
+  location            = azurerm_resource_group.rg.location
+  allocation_method   = "Dynamic"
 }
