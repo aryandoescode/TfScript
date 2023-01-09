@@ -103,3 +103,31 @@ resource "azurerm_public_ip" "ip" {
   location            = azurerm_resource_group.rg.location
   allocation_method   = "Dynamic"
 }
+
+resource "azurerm_monitor_action_group" "ag" {
+  name                = "myactiongroup"
+  resource_group_name = azurerm_resource_group.rg.name
+  short_name          = "ag"
+
+}
+
+resource "azurerm_monitor_metric_alert" "alert" {
+  name                = "alert"
+  resource_group_name = azurerm_resource_group.rg.name
+  scopes              = ["/subscriptions/af8b4d33-860a-4269-ba23-a037e1c8551c/resourceGroups/rg/providers/Microsoft.Compute/virtualMachines/vm"]
+  description         = "description"
+  target_resource_type = "Microsoft.Compute/virtualMachines"
+  
+  criteria { 
+    metric_namespace = "Microsoft.Compute/virtualMachines"
+    metric_name      = "Percentage CPU"
+    aggregation      = "Total"
+    operator         = "GreaterThan"
+    threshold        = 40
+
+  }
+
+  action {
+    action_group_id = azurerm_monitor_action_group.ag.id
+  }
+}
