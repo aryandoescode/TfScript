@@ -10,7 +10,9 @@ terraform {
 provider "azurerm" {
   features {
 
-  }
+ }
+  subscription_id   = "cdc3c0fa-a22b-420a-ac28-6c56ec56eb7a"
+  tenant_id         = "2848720d-5e3d-440c-8ed8-444178758db2"
 }
 
 resource "azurerm_resource_group" "rg" {
@@ -114,7 +116,7 @@ resource "azurerm_monitor_action_group" "ag" {
 resource "azurerm_monitor_metric_alert" "alert" {
   name                = "alert"
   resource_group_name = azurerm_resource_group.rg.name
-  scopes              = ["/subscriptions/af8b4d33-860a-4269-ba23-a037e1c8551c/resourceGroups/rg/providers/Microsoft.Compute/virtualMachines/vm"]
+  scopes              = ["/subscriptions/cdc3c0fa-a22b-420a-ac28-6c56ec56eb7a/resourceGroups/rg/providers/Microsoft.Compute/virtualMachines/vm"]
   description         = "description"
   target_resource_type = "Microsoft.Compute/virtualMachines"
   
@@ -123,7 +125,7 @@ resource "azurerm_monitor_metric_alert" "alert" {
     metric_name      = "Percentage CPU"
     aggregation      = "Total"
     operator         = "GreaterThan"
-    threshold        = 40
+    threshold        = 5
 
   }
 
